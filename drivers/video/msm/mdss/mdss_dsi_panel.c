@@ -26,6 +26,11 @@
 #include <mach/debug_display.h>
 #include <linux/msm_mdp.h>
 
+#ifdef CONFIG_BACKLIGHT_DIMMER
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
+#endif
+
 #define DT_CMD_HDR 6
 #define WLED_MAX_LEVEL	4095
 #define MDSS_BL_SETTING_DEF 142
@@ -33,6 +38,48 @@
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
 DEFINE_LED_TRIGGER(bl_led_i2c_trigger);
+
+#ifdef CONFIG_BACKLIGHT_DIMMER
+static int backlight_dimmer = 0;
+
+static ssize_t backlight_dimmer_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	ssize_t count = 0;
+	count += sprintf(buf, "%d\n", backlight_dimmer);
+	return count;
+}
+
+static ssize_t backlight_dimmer_store(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+
+	sscanf(buf, "%d ",&backlight_dimmer);
+	if (backlight_dimmer < 0 || backlight_dimmer > 3) {
+		backlight_dimmer = 0;
+	}
+	return count;
+}
+
+static struct kobj_attribute backlight_dimmer_attribute = 
+	__ATTR(backlight_dimmer, 0666,
+		backlight_dimmer_show,
+		backlight_dimmer_store);
+
+static struct attribute *backlight_dimmer_attrs[] =
+	{
+		&backlight_dimmer_attribute.attr,
+		NULL,
+	};
+
+static struct attribute_group backlight_dimmer_attr_group =
+	{
+		.attrs = backlight_dimmer_attrs,
+	};
+
+
+static struct kobject *backlight_dimmer_kobj;
+#endif
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -132,6 +179,35 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
 
+#ifdef CONFIG_BACKLIGHT_DIMMER
+#define BRI_SETTING_MIN                 30
+#define BRI_SETTING_DEF                 142
+#define BRI_SETTING_HIGH		200
+#define BRI_SETTING_EXTRA		230
+#define BRI_SETTING_MAX                 255
+static unsigned char shrink_pwm(int val, int pwm_min, int pwm_default, int pwm_max)
+{
+        unsigned char shrink_br = BRI_SETTING_MAX;
+
+        if (val <= 0) {
+                shrink_br = 0;
+        } else if (val > 0 && (val < BRI_SETTING_MIN)) {
+                shrink_br = pwm_min;
+        } else if ((val >= BRI_SETTING_MIN) && (val <= BRI_SETTING_DEF)) {
+                shrink_br = (val - BRI_SETTING_MIN) * (pwm_default - pwm_min) /
+                (BRI_SETTING_DEF - BRI_SETTING_MIN) + pwm_min;
+        } else if (val > BRI_SETTING_DEF && val <= BRI_SETTING_MAX) {
+                shrink_br = (val - BRI_SETTING_DEF) * (pwm_max - pwm_default) /
+                (BRI_SETTING_MAX - BRI_SETTING_DEF) + pwm_default;
+        } else if (val > BRI_SETTING_MAX)
+                shrink_br = pwm_max;
+
+        PR_DISP_INFO("brightness orig=%d, transformed=%d\n", val, shrink_br);
+
+        return shrink_br;
+}
+#endif
+
 static char led_pwm1[3] = {0x51, 0x0, 0x0};	
 static struct dsi_cmd_desc backlight_cmd = {
 	{DTYPE_DCS_LWRITE, 1, 0, 0, 1, sizeof(led_pwm1)},
@@ -144,8 +220,19 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 
 	pr_debug("%s: level=%d\n", __func__, level);
 
-	led_pwm1[1] = (unsigned char)level;
-
+#ifdef CONFIG_BACKLIGHT_DIMMER
+	//backlight dimmer	
+	if (backlight_dimmer == 1) {  //original is 6,56,255 my first version was 1,25,125
+		led_pwm1[1] = (unsigned char)shrink_pwm(level, 1, 45, 175);
+	} else if (backlight_dimmer == 2) {
+		led_pwm1[1] = (unsigned char)shrink_pwm(level, 1, 35, 130);
+	//stock
+	} else {
+#endif
+		led_pwm1[1] = (unsigned char)level;
+#ifdef CONFIG_BACKLIGHT_DIMMER
+	}
+#endif
 	led_pwm1[2] = led_pwm1[1];
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = &backlight_cmd;
@@ -1325,6 +1412,17 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->off = mdss_dsi_panel_off;
 	ctrl_pdata->panel_data.set_backlight = mdss_dsi_panel_bl_ctrl;
 	ctrl_pdata->panel_data.display_on = mdss_dsi_display_on;
+#ifdef CONFIG_BACKLIGHT_DIMMER
+	backlight_dimmer_kobj = kobject_create_and_add("backlight_dimmer", NULL);
+	if (backlight_dimmer_kobj == NULL) {
+		pr_warn("%s kobject create failed!\n", __func__);
+        }
+
+	rc = sysfs_create_group(backlight_dimmer_kobj, &backlight_dimmer_attr_group);
+        if (rc) {
+		pr_warn("%s sysfs file create failed!\n", __func__);
+	}
+#endif
 
 	return 0;
 }
