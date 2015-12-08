@@ -568,9 +568,6 @@ static int cpufreq_parse_dt(struct device *dev)
 
 	freq_table[i].index = i;
 	freq_table[i].frequency = CPUFREQ_TABLE_END;
-#ifdef CONFIG_EXT_CMD_LINE
-	max_freq_table_index = i - 1;	
-#endif
 	
 #ifdef CONFIG_MSM_CPU_VOLTAGE_CONTROL
 	/* Create frequence table with unrounded values */
