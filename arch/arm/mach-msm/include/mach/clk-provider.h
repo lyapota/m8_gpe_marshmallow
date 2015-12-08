@@ -45,10 +45,6 @@
 //elementalx
 extern unsigned long arg_cpu_oc;
 
-#ifdef CONFIG_EDP_LIMIT
-extern unsigned int edp_limit;
-#endif
-
 struct clk_register_data {
 	char *name;
 	u32 offset;

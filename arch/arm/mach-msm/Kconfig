@@ -1982,12 +1982,6 @@ config EXT_CMD_LINE
 	help
 	  This enables extended command line params.
 
-config EDP_LIMIT
-	bool "EDP limitation"
-	default y
-	help
-	  This enables EDP limitation.
-
 config MSM_CPU_VOLTAGE_CONTROL
 	bool "Userspace CPU Voltage Control"
 	default y

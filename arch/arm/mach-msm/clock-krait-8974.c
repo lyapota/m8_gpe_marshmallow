@@ -39,12 +39,6 @@
 #include <mach/perflock.h>
 #endif
 
-#ifdef CONFIG_EDP_LIMIT
-unsigned int edp_limit = 0;
-
-module_param(edp_limit, int, S_IRUGO | S_IWUSR);
-#endif
-
 #ifdef CONFIG_EXT_CMD_LINE
 unsigned long arg_cpu_oc = 0;
 static int arg_vdd_uv = 0;
