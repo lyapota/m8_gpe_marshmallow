@@ -266,11 +266,11 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 
 		
 	} else {
-endif
+#endif
 	bl_lvl = htc_backlight_transfer_bl_brightness(value, mfd->panel_info, true);
 #ifdef CONFIG_BACKLIGHT_DIMMER
 	}
-endif
+#endif
 
 	if (bl_lvl < 0) {
 		MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
